@@ -2,6 +2,7 @@
 
 #include <caffe2/serialize/versions.h>
 #include <c10/util/Exception.h>
+#include <torch/csrc/jit/frontend/schema_matching.h>
 #include <torch/csrc/jit/ir/irparser.h>
 #include <torch/csrc/jit/operator_upgraders/upgraders.h>
 #include <torch/csrc/jit/operator_upgraders/utils.h>
@@ -27,7 +28,7 @@ struct OldOpsReplacer {
     int updated_version = 0;
     while (node) {
       if (auto schema = node->maybeSchema()) {
-        auto schema_name = schema->name() + (schema->overload_name() != "" ? "." + schema->overload_name() : "");
+        auto schema_name = getFullSchemaName(*schema);
         // this implies there was a version bump because of this operator
         auto version_entry = kOperatorVersionMap.find(schema_name);
         if (version_entry != kOperatorVersionMap.end()) {
@@ -43,8 +44,8 @@ struct OldOpsReplacer {
           }
           auto upgrader_entry_val = upgrader_entry.value();
           auto upgrader_name = upgrader_entry_val.upgrader_name;
-          auto upgrader_graph_entry = upgraders_graph.find(upgrader_name);
-          TORCH_INTERNAL_ASSERT(upgrader_graph_entry != upgraders_graph.end(), "Corresponding upgrader graph for ", upgrader_name, " must exist");
+          auto upgrader_graph_entry = dump_upgraders_map().find(upgrader_name);
+          TORCH_INTERNAL_ASSERT(upgrader_graph_entry != dump_upgraders_map().end(), "Corresponding upgrader graph for ", upgrader_name, " must exist");
           Graph upgrader_graph;
           parseIR(upgrader_graph_entry->second, &upgrader_graph);
           // inline the upgrader function body
